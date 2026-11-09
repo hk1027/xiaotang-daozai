@@ -10,6 +10,20 @@ fn plan_label(id:&str)->String{
     let raw=id.strip_prefix("individual-").or_else(||id.strip_prefix("team-")).unwrap_or(id);
     match raw{"goat"=>"GOAT".into(),"go"=>"Go".into(),"pro"=>"Pro".into(),other=>other.to_owned()}
 }
+/// 官方 CLI 内置的套餐额度表；表里没有的套餐不猜总额。
+fn plan_pool(id:&str)->Option<f64>{
+    Some(match id{
+        "individual-go"|"individual-go-v1"=>10.0,
+        "individual-goat"=>70.0,
+        "individual-pro"=>30.0,
+        "individual-pro-v1"=>80.0,
+        "individual-provider"=>15.0,
+        "individual-max"=>150.0,
+        "individual-ultra"=>300.0,
+        "teams-pro"=>40.0,
+        _=>return None,
+    })
+}
 pub(super) fn parse(value:&Value)->Result<Snapshot,String>{
     let limits=value.get("windowLimits").ok_or("Command Code 尚未返回额度窗口")?;
     let mut windows=Vec::new();
@@ -37,9 +51,23 @@ fn get(agent:&ureq::Agent,path:&str,key:&str)->Result<Value,(String,u64)>{
 fn fetch_with_key(agent:&ureq::Agent,key:&str)->Result<Snapshot,String>{
     let credits=get(agent,"/alpha/billing/credits",key).map_err(|e|e.0)?;
     let mut snapshot=parse(&credits)?;
-    // 套餐名只用于展示，查询失败不影响额度。
+    // 套餐名与月度额度只用于展示，订阅查询失败不影响两个滚动窗口。
     if let Ok(subscription)=get(agent,"/alpha/billing/subscriptions",key){
-        if let Some(id)=subscription.pointer("/data/planId").and_then(Value::as_str){snapshot.plan=plan_label(id);}
+        if let Some(id)=subscription.pointer("/data/planId").and_then(Value::as_str){
+            snapshot.plan=plan_label(id);
+            if let (Some(pool),Some(left),Some(week))=(
+                plan_pool(id),
+                super::number(&credits["credits"]["monthlyCredits"]),
+                super::number(&credits["windowLimits"]["weekly"]["used"]),
+            ){
+                // monthlyCredits 是剩余量；用「周已用 + 剩余 = 套餐总额」反查，表过期就不显示本月。
+                if pool>0.0 && (pool-left-week).abs()<0.02 {
+                    let reset=subscription.pointer("/data/currentPeriodEnd").and_then(Value::as_str)
+                        .and_then(|s|chrono::DateTime::parse_from_rfc3339(s).ok()).map(|t|t.timestamp());
+                    snapshot.windows.push(Window{label:"本月".into(),seconds:None,remaining:(left/pool*100.0).clamp(0.0,100.0) as f32,reset});
+                }
+            }
+        }
     }
     Ok(snapshot)
 }

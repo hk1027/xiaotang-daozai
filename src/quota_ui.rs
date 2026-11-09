@@ -330,7 +330,17 @@ impl App {
         c.text(157.0,64.0,&c.fit(&label,12.0,W::Semibold,145.0),12.0,W::Semibold,theme::WHITE,H::Left);
         if let Some(s)=snapshot{
             let windows=s.rings();let now=chrono::Local::now();
-            if windows.is_empty() && a.provider==Provider::ZCode{
+            if a.provider==Provider::CommandCode&&s.windows.len()>2{
+                c.text(355.0,64.0,"剩余",10.5,W::Regular,theme::GRAY,H::Right);
+                for (i,w)in s.windows.iter().take(3).enumerate(){
+                    let y=78.0+i as f32*24.0;
+                    c.circle(159.0,y-4.0,2.5,colors[i%2]);
+                    c.text(168.0,y,&w.label,11.0,W::Semibold,theme::WHITE,H::Left);
+                    let reset=reset_text(w.reset,&now);
+                    c.text(168.0,y+14.0,&c.fit(&reset,10.0,W::Regular,175.0),10.0,W::Regular,theme::GRAY,H::Left);
+                    c.centered_text(355.0,y+2.0,&format!("{:.0}%",w.remaining),17.0,W::Semibold,theme::WHITE,H::Right);
+                }
+            }else if windows.is_empty() && a.provider==Provider::ZCode{
                 c.text(157.0,104.0,"官网未分配体验额度",11.0,W::Regular,theme::GRAY,H::Left);
             }else if windows.len()==1{
                 let w=windows[0];c.text(157.0,103.0,&format!("{}剩余",w.label),12.0,W::Semibold,theme::WHITE,H::Left);
