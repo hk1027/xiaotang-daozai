@@ -14,6 +14,8 @@ pub(crate) mod workbuddy;
 pub(crate) mod deepseek;
 #[path="zcode_quota.rs"]
 pub(crate) mod zcode;
+#[path="commandcode_quota.rs"]
+pub(crate) mod commandcode;
 #[path="native_auth.rs"]
 mod native_auth;
 
@@ -26,10 +28,10 @@ impl Discovery {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Provider { #[default] Codex, Claude, Kimi, GrokBot, Gemini, ZCode, WorkBuddy, DeepSeek }
+pub enum Provider { #[default] Codex, Claude, Kimi, GrokBot, Gemini, ZCode, WorkBuddy, DeepSeek, CommandCode }
 impl Provider {
-    pub const ALL: [Self; 8] = [Self::Codex, Self::Claude, Self::Kimi, Self::GrokBot, Self::Gemini, Self::ZCode, Self::WorkBuddy, Self::DeepSeek];
-    pub fn name(self) -> &'static str { match self {Self::Codex=>"Codex",Self::Claude=>"Claude",Self::Kimi=>"Kimi",Self::GrokBot=>"Grok Bot",Self::Gemini=>"Gemini",Self::ZCode=>"ZCode",Self::WorkBuddy=>"WorkBuddy",Self::DeepSeek=>"DeepSeek"} }
+    pub const ALL: [Self; 9] = [Self::Codex, Self::Claude, Self::Kimi, Self::GrokBot, Self::Gemini, Self::ZCode, Self::WorkBuddy, Self::DeepSeek, Self::CommandCode];
+    pub fn name(self) -> &'static str { match self {Self::Codex=>"Codex",Self::Claude=>"Claude",Self::Kimi=>"Kimi",Self::GrokBot=>"Grok Bot",Self::Gemini=>"Gemini",Self::ZCode=>"ZCode",Self::WorkBuddy=>"WorkBuddy",Self::DeepSeek=>"DeepSeek",Self::CommandCode=>"Command Code"} }
     pub fn balance(self)->bool{matches!(self,Self::WorkBuddy|Self::DeepSeek)}
     fn parse(s: &str) -> Option<Self> {if s.eq_ignore_ascii_case("grokbot"){return Some(Self::GrokBot);}Self::ALL.into_iter().find(|p|p.name().eq_ignore_ascii_case(s))}
 }
@@ -68,6 +70,7 @@ impl Config {
         if provider==Provider::ZCode{return zcode::add(self,&source,&alias);}
         if provider==Provider::WorkBuddy{return Err("请使用浏览器连接 WorkBuddy".into());}
         if provider==Provider::DeepSeek{return Err("请使用 API Key 连接 DeepSeek".into());}
+        if provider==Provider::CommandCode{return Err("请使用 API Key 连接 Command Code".into());}
         if provider==Provider::Gemini{return Err("请使用浏览器或 Cookie 连接 Gemini 网页账号".into());}
         if provider==Provider::GrokBot{return self.import_grok(&source,&alias).map(|_|());}
         if provider==Provider::Claude{return self.import_claude(&source,&alias).map(|_|());}
@@ -182,6 +185,15 @@ impl Config {
         if let Some(a)=self.accounts.iter_mut().find(|a|a.provider==Provider::DeepSeek&&a.slot.as_deref()==Some(&slot)){a.alias=alias;a.enabled=true;self.selected=a.id.clone();return a.id.clone();}
         let id=format!("DeepSeek-{slot}");self.selected=id.clone();self.accounts.push(Account{id:id.clone(),provider:Provider::DeepSeek,alias,source:PathBuf::new(),slot:Some(slot),enabled:true,pinned:true});id
     }
+    pub fn connect_commandcode(&mut self,slot:String,alias:String)->String{
+        if let Some(a)=self.accounts.iter_mut().find(|a|a.provider==Provider::CommandCode&&a.slot.as_deref()==Some(&slot)){a.alias=alias;a.enabled=true;self.selected=a.id.clone();return a.id.clone();}
+        let id=format!("CommandCode-{slot}");self.selected=id.clone();self.accounts.push(Account{id:id.clone(),provider:Provider::CommandCode,alias,source:PathBuf::new(),slot:Some(slot),enabled:true,pinned:true});id
+    }
+    pub fn reconnect_commandcode(&mut self,id:&str,slot:String,alias:String)->Result<String,String>{
+        if self.accounts.iter().any(|a|a.id!=id&&a.provider==Provider::CommandCode&&a.slot.as_deref()==Some(&slot)){return Err("这把 API Key 已连接到另一个账号".into());}
+        let account=self.accounts.iter_mut().find(|a|a.id==id&&a.provider==Provider::CommandCode).ok_or("原账号已移除，请重新添加")?;
+        account.slot=Some(slot);account.alias=alias;self.selected=id.into();Ok(id.into())
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 #[derive(serde::Serialize,serde::Deserialize)]
@@ -216,6 +228,7 @@ pub fn parse(provider:Provider,v:&Value)->Result<Snapshot,String>{
     if provider==Provider::DeepSeek{return deepseek::parse(v);}
     if provider==Provider::GrokBot{return grok::parse(v);}
     if provider==Provider::Gemini{return gemini::parse(v);}
+    if provider==Provider::CommandCode{return commandcode::parse(v);}
     let mut s=Snapshot{plan:v["plan_type"].as_str().unwrap_or_default().into(),at:chrono::Utc::now().timestamp(),..Default::default()};
     match provider {
         Provider::Codex=>{
@@ -242,7 +255,7 @@ pub fn parse(provider:Provider,v:&Value)->Result<Snapshot,String>{
             if let Some(w)=section(&v["usage"],Some(604800)){s.windows.push(w);}
             for limit in v["limits"].as_array().into_iter().flatten(){let duration=limit["window"]["duration"].as_i64();let unit=limit["window"]["timeUnit"].as_str().unwrap_or_default();let factor=match unit{"TIME_UNIT_MINUTE"=>Some(60),"TIME_UNIT_HOUR"=>Some(3600),"TIME_UNIT_DAY"=>Some(86400),"TIME_UNIT_SECOND"=>Some(1),_=>None};let seconds=duration.zip(factor).and_then(|(d,f)|d.checked_mul(f));if let Some(w)=section(&limit["detail"],seconds){if !s.windows.iter().any(|old|old.seconds==w.seconds){s.windows.push(w);}}}
         }
-        Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek=>unreachable!(),
+        Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek|Provider::CommandCode=>unreachable!(),
     }
     if s.windows.is_empty(){return Err("服务未提供周期额度，暂不绘制进度".into());}
     s.windows.sort_by_key(|w|w.seconds.unwrap_or(i64::MAX));Ok(s)
@@ -261,7 +274,7 @@ fn credentials(provider:Provider,path:&Path)->Result<Credential,String>{
     if provider==Provider::Claude{return Err("Claude 仅使用本地用量记录，不读取登录令牌".into());}
     let root=login_json(path)?;
     let v=if provider==Provider::Codex{root.get("auth_json").unwrap_or(&root)}else{&root};
-    let token=match provider{Provider::Codex=>v.pointer("/tokens/access_token").or_else(||v.get("access_token")),Provider::Kimi=>v.get("access_token"),Provider::Claude|Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek=>None}.and_then(Value::as_str).filter(|s|!s.trim().is_empty()).ok_or("未找到订阅账号的登录凭据，请选择对应工具的登录文件")?.to_owned();
+    let token=match provider{Provider::Codex=>v.pointer("/tokens/access_token").or_else(||v.get("access_token")),Provider::Kimi=>v.get("access_token"),Provider::Claude|Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek|Provider::CommandCode=>None}.and_then(Value::as_str).filter(|s|!s.trim().is_empty()).ok_or("未找到订阅账号的登录凭据，请选择对应工具的登录文件")?.to_owned();
     let claims=token.split('.').nth(1).and_then(|b|base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(b).ok()).and_then(|b|serde_json::from_slice::<Value>(&b).ok()).unwrap_or(Value::Null);
     let account_id=v.pointer("/tokens/account_id").or_else(||v.get("account_id")).and_then(Value::as_str).or_else(||claims.pointer("/https:~1~1api.openai.com~1auth/chatgpt_account_id").and_then(Value::as_str)).filter(|s|!s.is_empty()).map(str::to_owned);
     let identity=match provider{
@@ -350,8 +363,9 @@ fn fetch(agent:&ureq::Agent,account:&Account)->Result<Snapshot,(String,u64)>{
     if account.provider==Provider::DeepSeek{return deepseek::fetch(agent,account);}
     if account.provider==Provider::GrokBot{return grok::fetch(agent,account);}
     if account.provider==Provider::Gemini{return gemini::fetch(agent,account);}
+    if account.provider==Provider::CommandCode{return commandcode::fetch(agent,account);}
     let auth=account_credentials(account).map_err(|e|(e,0))?;
-    let url=match account.provider{Provider::Codex=>"https://chatgpt.com/backend-api/wham/usage",Provider::Kimi=>"https://api.kimi.com/coding/v1/usages",Provider::Claude|Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek=>unreachable!()};
+    let url=match account.provider{Provider::Codex=>"https://chatgpt.com/backend-api/wham/usage",Provider::Kimi=>"https://api.kimi.com/coding/v1/usages",Provider::Claude|Provider::ZCode|Provider::GrokBot|Provider::Gemini|Provider::WorkBuddy|Provider::DeepSeek|Provider::CommandCode=>unreachable!()};
     let mut req=agent.get(url).set("Authorization",&format!("Bearer {}",auth.token)).set("Accept","application/json").set("User-Agent","codex-cli/Daozai");
     if account.provider==Provider::Codex{if let Some(id)=&auth.account_id{req=req.set("ChatGPT-Account-Id",id);}}
     let response=req.call().map_err(|e|match e{ureq::Error::Status(401|403,_)=>("登录已失效或权限不足，请在对应工具中重新登录".into(),0),ureq::Error::Status(429,r)=>("请求过于频繁，稍后自动重试".into(),r.header("Retry-After").and_then(|s|s.parse().ok()).unwrap_or(180).clamp(30,3600)),ureq::Error::Status(n,_)=>(format!("额度服务暂不可用（{n}）"),60),_=>("无法连接额度服务，请检查网络或代理".into(),30)})?;
