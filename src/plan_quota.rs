@@ -225,7 +225,7 @@ fn commandcode_monthly(agent:&ureq::Agent,key:&str,s:&mut Snapshot,credits:&Valu
     let (Some(left),Some(week))=(number(&credits["credits"]["monthlyCredits"]),number(&credits["windowLimits"]["weekly"]["used"])) else{return;};
     // monthlyCredits 是剩余量；用「周已用 + 剩余 = 套餐总额」反查，表过期就不显示本月。
     if pool<=0.0||(pool-left-week).abs()>=0.02{return;}
-    let reset=subscription.pointer("/data/currentPeriodEnd").and_then(Value::as_str).and_then(iso);
+    let reset=subscription.pointer("/data/currentPeriodEnd").and_then(|v|iso(v));
     s.windows.push(window("本月",None,(left/pool*100.0).clamp(0.0,100.0) as f32,reset));
 }
 
