@@ -1,0 +1,28 @@
+#pragma code_page(65001)
+1 ICON "assets/daozai.ico"
+1 VERSIONINFO
+ FILEVERSION 0,6,65,0
+ PRODUCTVERSION 0,6,65,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "FileDescription", "岛仔"
+            VALUE "InternalName", "Daozai"
+            VALUE "OriginalFilename", "daozai.exe"
+            VALUE "ProductName", "岛仔 Daozai"
+            VALUE "ProductVersion", "0.6.65"
+            VALUE "FileVersion", "0.6.65"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

@@ -1,0 +1,56 @@
+name: 功能建议
+description: 提出新功能或改进现有功能
+title: "[建议] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的建议！提交前请先看一下：
+
+        - 岛仔正在做**插件系统**（进展见 #138）。接入某个服务（AI 额度、日程、邮箱、聊天软件等），或者显示个人关心的数据（监控、倒计时、某个网站的数据等），这类需求会优先交给插件实现，做好后所有人都能用，也不用等岛仔发版。
+        - 提交前可以先搜一下已有 issue，相同的需求直接在原帖下补充就好。
+        - 请不要上传密码、Token、Cookie、登录文件或未脱敏的日志。
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 需求类型
+      options:
+        - 接入新的服务（AI 额度、日程、邮箱、聊天软件等）
+        - 新增显示内容（监控、倒计时、某个网站的数据等）
+        - 主题、皮肤、宠物表情等外观
+        - 改进现有功能或界面
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你在什么情况下需要它？现在是怎么做的，哪里不方便？
+    validations:
+      required: true
+
+  - type: textarea
+    id: expectation
+    attributes:
+      label: 希望的效果
+      description: 希望岛仔怎么做？有截图或参考图更好。
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 补充信息
+      description: 已经调研过的接口、数据位置、参考实现等，可选。
+
+  - type: checkboxes
+    id: plugin
+    attributes:
+      label: 插件
+      options:
+        - label: 我了解接入特定服务、个人定制类的需求会优先交给插件实现
+          required: true
+        - label: 我愿意自己把它做成插件分享给大家

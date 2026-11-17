@@ -1,0 +1,45 @@
+name: Windows 检查
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    env:
+      CARGO_BUILD_JOBS: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 Rust stable
+        run: rustup toolchain install stable --profile minimal
+      - name: 验证 HTTP 代理请求格式
+        run: cargo +stable test --locked --manifest-path vendor/ureq/Cargo.toml --lib --no-default-features --features tls,gzip --target x86_64-pc-windows-msvc unit::tests
+      - name: 测试
+        run: cargo +stable test --locked --all-targets --features record --target x86_64-pc-windows-msvc -- --test-threads=1
+      - name: 检查安装脚本语法
+        shell: pwsh
+        run: |
+          Get-ChildItem installer,scripts -Filter *.ps1 -Recurse | ForEach-Object {
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$null,[ref]$parseErrors) | Out-Null
+            if ($parseErrors) { throw ($parseErrors | Out-String) }
+          }
+      - name: 验证发布构建与打包
+        shell: pwsh
+        run: |
+          $compiler = ./scripts/get-nsis.ps1 -Directory $env:RUNNER_TEMP
+          ./scripts/package.ps1 -NsisCompiler $compiler
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 验证安装、升级与卸载
+        shell: pwsh
+        run: |
+          $compiler = ./scripts/get-nsis.ps1 -Directory $env:RUNNER_TEMP
+          ./tests/native_installer.ps1 -NsisCompiler $compiler
+          ./tests/update_installer.ps1
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/diagnostics_archive.ps1
+          if ($LASTEXITCODE -ne 0) { throw '诊断归档测试失败' }
+          exit 0

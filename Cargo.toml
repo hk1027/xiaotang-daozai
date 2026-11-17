@@ -1,0 +1,117 @@
+[package]
+name = "daozai"
+version = "0.6.65"
+edition = "2021"
+license = "MIT"
+description = "岛仔：Windows 顶部的桌面伙伴与信息岛"
+repository = "https://github.com/Renly1994/xiaotang-daozai"
+default-run = "daozai"
+
+[lib]
+name = "daozai"
+path = "src/lib.rs"
+
+[[bin]]
+name = "daozai"
+path = "src/main.rs"
+
+# 无窗口演示录制器：脚本驱动 + 软件光栅化，输出 RGBA 帧流给 ffmpeg。
+[[bin]]
+name = "daozai-record"
+path = "src/bin/daozai-record/main.rs"
+required-features = ["record"]
+
+[features]
+record = []
+
+[patch.crates-io]
+imap = { path = "vendor/imap" }
+imap-proto = { path = "vendor/imap-proto" }
+eframe = { path = "vendor/eframe" }
+egui = { path = "vendor/egui" }
+ureq = { path = "vendor/ureq" }
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["glow", "wgpu", "default_fonts"] }
+egui_extras = { version = "0.31", default-features = false, features = ["svg", "image"] }
+ureq = { version = "2.12", default-features = false, features = ["tls", "gzip"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+flate2 = "1"
+zstd = { version = "0.13.3", default-features = false }
+ring = "0.17"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+raw-window-handle = "0.6"
+# v0.5.5 邮件：MIME 解析与验证码打分是纯逻辑，保持跨平台。
+mailparse = "0.18"
+regex = "1"
+url = "2"
+chrono = "0.4"
+chrono-tz = "0.10"
+rrule = "0.14.0"
+rquickjs = "0.8"
+
+# Linux 下 winit 至少要一个后端才能编译（只用于开发/录制，正式目标是 Windows）。
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.31", default-features = false, features = ["glow", "default_fonts", "x11"] }
+
+[target.'cfg(windows)'.dependencies]
+ureq = { version = "2.12", default-features = false, features = ["native-tls"] }
+tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
+clipboard-win = "5.4.3"
+wgpu = { version = "24", default-features = false, features = ["dx12"] }
+memmap2 = "0.9.12"
+windows = { version = "0.58", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Memory",
+  "Win32_System_Com",
+  "Win32_System_DataExchange",
+  "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_System_RemoteDesktop",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_Storage_FileSystem",
+  "Win32_Storage_Packaging_Appx",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Input_Ime", "Win32_UI_TextServices",
+  "Win32_UI_Accessibility",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  "Media_Control",
+  "Foundation",
+  "Foundation_Collections",
+  "Storage_Streams",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_Media_Audio",
+  "Win32_System_WinRT",
+  "Win32_System_WinRT_Composition", "UI_Composition", "UI_Composition_Desktop", "System", "Foundation_Numerics",
+  "UI_Notifications_Management",
+  "UI_Notifications", "ApplicationModel",
+  "Win32_System_Ole", "Win32_UI_Shell_Common", "Networking_Connectivity",
+  "Win32_Devices_DeviceAndDriverInstallation",
+  "Win32_Devices_Properties",
+  "Win32_Devices_Bluetooth",
+  "Devices_Bluetooth", "Devices_Enumeration",
+] }
+# v0.5.5 邮件：IMAP 走系统 TLS，凭据进 Windows 凭据管理器。
+imap = "2.4"
+imap-proto = "0.10.2"
+native-tls = "0.2"
+keyring = { version = "3", features = ["windows-native"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
