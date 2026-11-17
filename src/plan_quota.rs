@@ -226,7 +226,7 @@ fn commandcode_monthly(agent:&ureq::Agent,key:&str,s:&mut Snapshot,credits:&Valu
     // monthlyCredits 是剩余量；周窗口会先于月周期重置，只能校验区间：
     // 本月已用必须落在 0..=总额 内且不少于本周已用，否则说明套餐表过期，宁可不显示。
     let month=pool-left;
-    if pool<=0.0||month<-0.02||month>pool+0.02||month+0.02<week{return;}
+    if pool<=0.0||month < -0.02||month>pool+0.02||month+0.02<week{return;}
     let reset=subscription.pointer("/data/currentPeriodEnd").and_then(|v|iso(v));
     s.windows.push(window("本月",None,(left/pool*100.0).clamp(0.0,100.0) as f32,reset));
 }
